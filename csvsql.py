@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
-# usage: ./import-csv.py *.csv
+# usage: see example.py
 
 # import one or more CSV into a MySQL database
 # detects (some) column types and allows for caching these types for consistency
@@ -16,9 +16,12 @@
 # (note to myself: do not spend more than this day on this!)
 
 
-# Requirement:  Mysqldb   (pip install MySQL-python)
-
+# Requirements:  python2.7 [Mysqldb won't work on py3]
+#                Mysqldb   (pip install MySQL-python)
+#                dateutil (optional.  pip install python-dateutil)
     
+
+from __future__ import print_function
 
 import subprocess
 import time
@@ -47,7 +50,11 @@ class SshTunnel(threading.Thread):
 
 
 import re
-from dateutil import parser
+try:
+    from dateutil import parser
+except ImportError:  # if not available
+    pass
+
 import datetime
 
 import MySQLdb
@@ -83,8 +90,6 @@ class CsvSqlImporter:
     ##########
 
 
-    after_insert_row = None  # optimization
-        
     @staticmethod
     def sanitize_name(t):
         t = re.sub(r"\.","",t)
@@ -108,13 +113,16 @@ class CsvSqlImporter:
                 return CsvSqlImporter.get_converter("FLOAT-X")
         except:
             pass
+        
         try:
             if len(example)>4 and " " in example and (":" in example or "/" in example or "-" in example):
+                # the following may fail if dateutil is not installed
                 dt = parser.parse(example)
                 if dt:
                     return CsvSqlImporter.get_converter("DATETIME")
         except:
             pass
+        
         return CsvSqlImporter.get_converter("STRING")
 
     @staticmethod
@@ -124,7 +132,11 @@ class CsvSqlImporter:
         if "FLOAT-X" == type:
             return (type, "FLOAT(4)", lambda x: float(x[1:]))
         if "DATETIME" == type:
-            return (type, "DATETIME", lambda x: parser.parse(x).strftime('%Y-%m-%d %H:%M:%S'))
+            try:
+                if parser.parse:  # dateutil available
+                    return (type, "DATETIME", lambda x: parser.parse(x).strftime('%Y-%m-%d %H:%M:%S'))
+            except:
+                pass
         return ("STRING", "VARCHAR(200) CHARACTER SET utf8", lambda x: x)
 
     def add_column(self, name, sqltype):
@@ -138,7 +150,9 @@ class CsvSqlImporter:
             pass  # double entry
         return False
 
-
+    def print(self, *args, **kwargs):
+        print(*args, **kwargs)
+    
     def __init__(self, files, sql_user, sql_password, database, table, host="localhost", ssh_username=None):
         self.files = files
         self.host = host
@@ -195,7 +209,7 @@ class CsvSqlImporter:
         self.additional_table_prep(self.table)
 
         for file in self.files:
-            print("Importing ", file, "...", end=' ')
+            self.print("Importing ", file, "...", end=' ')
 
             new_entry_ids = [] # (hit_id, mturk_id)
 
@@ -238,7 +252,7 @@ class CsvSqlImporter:
                             dc = fun(d)
 
                         except:
-                            print("failed to convert d=",d," as type", typ)
+                            self.print("failed to convert d=",d," as type", typ)
                             dc = d
                         data_conv += [dc]
 
@@ -250,9 +264,9 @@ class CsvSqlImporter:
                         # keep track
                         new_entry_ids += [self.cursor.lastrowid]
                         # single entry postprocessing
-                        self.after_insert_row(colums, data_conv)
+                        self.after_insert_row(columns, data_conv)
                     except OperationalError as e:
-                        print("error: ",e) 
+                        self.print("error: ",e) 
 
                 connection.commit()
 
@@ -260,13 +274,13 @@ class CsvSqlImporter:
             self.file_post_processing(new_entry_ids, file)
             connection.commit()
 
-            print("%s entries imported."%len(new_entry_ids))
+            self.print("%s entries imported."%len(new_entry_ids))
                 
         # ok, update all bonus entries
 
         if self.addl_columns_added:
-            print("Additional columns were added.  Complete list (for consistency): ")
-            print("importer.set_column_types(%s)"%self.types)
+            self.print("Additional columns were added.  Complete list (for consistency): ")
+            self.print("importer.set_column_types(%s)"%self.types)
 
 
 
