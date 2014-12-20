@@ -17,17 +17,18 @@ See git log for changes and version numbers.
 
 
 Written by
-=======
+--------
+
 David Reitter, Penn State, reitter@psu.edu
 
 
 License
-======
 GPL v.3 or later.  Use at your own risk.
 
 
 To Do
-======
+-----
+
 Replace MySqlDb with a more generic library or Oracle's connector
 (something that supports Python3 perhaps)
 
