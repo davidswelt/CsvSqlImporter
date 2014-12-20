@@ -76,13 +76,15 @@ class CsvSqlImporter:
         the DB to retrieve the row.
         """
         pass
-    def after_insert_row(self, row_dict):
+    def after_insert_row(self, colnames, data):
         """Called after each individual inserted row.
         Transaction may not be committed to DB at that point."""
         pass
     ##########
 
-    
+
+    after_insert_row = None  # optimization
+        
     @staticmethod
     def sanitize_name(t):
         t = re.sub(r"\.","",t)
@@ -193,7 +195,7 @@ class CsvSqlImporter:
         self.additional_table_prep(self.table)
 
         for file in self.files:
-            print "Importing ", file, "...",
+            print("Importing ", file, "...", end=' ')
 
             new_entry_ids = [] # (hit_id, mturk_id)
 
@@ -236,7 +238,7 @@ class CsvSqlImporter:
                             dc = fun(d)
 
                         except:
-                            print "failed to convert d=",d," as type", typ
+                            print("failed to convert d=",d," as type", typ)
                             dc = d
                         data_conv += [dc]
 
@@ -248,10 +250,9 @@ class CsvSqlImporter:
                         # keep track
                         new_entry_ids += [self.cursor.lastrowid]
                         # single entry postprocessing
-                        self.after_insert_row(zip(columns,data_conv))
-    
+                        self.after_insert_row(colums, data_conv)
                     except OperationalError as e:
-                        print "error: ",e 
+                        print("error: ",e) 
 
                 connection.commit()
 
@@ -259,13 +260,13 @@ class CsvSqlImporter:
             self.file_post_processing(new_entry_ids, file)
             connection.commit()
 
-            print "%s entries imported."%len(new_entry_ids)
+            print("%s entries imported."%len(new_entry_ids))
                 
         # ok, update all bonus entries
 
         if self.addl_columns_added:
-            print "Additional columns were added.  Complete list (for consistency): "
-            print "importer.set_column_types(%s)"%self.types
+            print("Additional columns were added.  Complete list (for consistency): ")
+            print("importer.set_column_types(%s)"%self.types)
 
 
 
